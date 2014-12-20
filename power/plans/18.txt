@@ -1,0 +1,61 @@
+BEGIN;
+BEGIN
+EXPLAIN
+select
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice,
+	sum(l_quantity)
+from
+	customer,
+	orders,
+	lineitem
+where
+	o_orderkey in (
+		select
+			l_orderkey
+		from
+			lineitem
+		group by
+			l_orderkey having
+				sum(l_quantity) > 313
+	)
+	and c_custkey = o_custkey
+	and o_orderkey = l_orderkey
+group by
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice
+order by
+	o_totalprice desc,
+	o_orderdate
+LIMIT 100;
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=10312636.02..10312638.77 rows=100 width=39)
+   ->  GroupAggregate  (cost=10312636.02..11137446.05 rows=29993092 width=39)
+         ->  Sort  (cost=10312636.02..10387618.75 rows=29993092 width=39)
+               Sort Key: orders.o_totalprice, orders.o_orderdate, customer.c_name, customer.c_custkey, orders.o_orderkey
+               ->  Hash Join  (cost=3052610.83..5767647.89 rows=29993092 width=39)
+                     Hash Cond: (public.lineitem.l_orderkey = orders.o_orderkey)
+                     ->  Seq Scan on lineitem  (cost=0.00..1665278.84 rows=59986184 width=8)
+                     ->  Hash  (cost=2958860.83..2958860.83 rows=7500000 width=39)
+                           ->  Hash Join  (cost=2177235.37..2958860.83 rows=7500000 width=39)
+                                 Hash Cond: (orders.o_custkey = customer.c_custkey)
+                                 ->  Hash Join  (cost=2108207.37..2739832.83 rows=7500000 width=20)
+                                       Hash Cond: (orders.o_orderkey = public.lineitem.l_orderkey)
+                                       ->  Seq Scan on orders  (cost=0.00..403269.00 rows=15000000 width=16)
+                                       ->  Hash  (cost=2057136.79..2057136.79 rows=4085646 width=4)
+                                             ->  HashAggregate  (cost=1965209.76..2016280.33 rows=4085646 width=8)
+                                                   Filter: (sum(public.lineitem.l_quantity) > 313::double precision)
+                                                   ->  Seq Scan on lineitem  (cost=0.00..1665278.84 rows=59986184 width=8)
+                                 ->  Hash  (cost=50278.00..50278.00 rows=1500000 width=23)
+                                       ->  Seq Scan on customer  (cost=0.00..50278.00 rows=1500000 width=23)
+(19 rows)
+
+COMMIT;
+COMMIT
